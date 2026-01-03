@@ -1,0 +1,66 @@
+<div class="flex h-screen w-screen overflow-hidden bg-slate-50">
+  <!-- Desktop Sidebar -->
+  <app-sidebar 
+    [currentView]="currentView()" 
+    (viewChange)="changeView($event)">
+  </app-sidebar>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 overflow-y-auto h-full p-4 md:p-8 relative scroll-smooth">
+    <!-- Header for Mobile -->
+    <div class="md:hidden flex justify-between items-center mb-6">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">RH</div>
+        <span class="font-bold text-slate-800">Gestão Pro</span>
+      </div>
+      <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs">CS</div>
+    </div>
+
+    <!-- Content Container -->
+    <div class="max-w-6xl mx-auto pb-24 md:pb-10">
+      
+      <!-- Dynamic View Rendering -->
+      @switch (currentView()) {
+        @case ('dashboard') {
+          <app-dashboard />
+        }
+        @case ('time-clock') {
+          <app-time-clock />
+        }
+        @case ('payslips') {
+          <app-payslips />
+        }
+        @case ('bank-hours') {
+          <app-bank-hours />
+        }
+        @case ('esocial') {
+          <app-esocial-status />
+        }
+        @case ('compliance') {
+          <app-admin-panel />
+        }
+        @default {
+          <div class="flex flex-col items-center justify-center h-96 text-slate-400">
+            <span class="text-4xl mb-4">🚧</span>
+            <p>Módulo em desenvolvimento</p>
+          </div>
+        }
+      }
+
+    </div>
+
+    <!-- Compliance Footer (Hidden on mobile to save space) -->
+    <footer class="hidden md:block mt-12 border-t border-slate-200 py-6 text-center text-xs text-slate-400">
+      <p>Gestão RH Pro © 2024 • Conformidade Brasil</p>
+      <p class="mt-1">
+        Portaria 671 (REP-P) • eSocial S-1.2 • LGPD • ISO 27001
+      </p>
+    </footer>
+  </main>
+
+  <!-- Mobile Bottom Navigation -->
+  <app-mobile-nav 
+    [currentView]="currentView()"
+    (viewChange)="changeView($event)">
+  </app-mobile-nav>
+</div>

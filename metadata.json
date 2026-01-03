@@ -1,0 +1,8 @@
+{
+  "name": "Gestão RH Pro - Compliance Brasil",
+  "description": "Sistema de Gestão de RH focado em conformidade legal brasileira (Portaria 671, eSocial, LGPD). Demonstração do portal do colaborador e painel de controle.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

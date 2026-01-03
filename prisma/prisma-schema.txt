@@ -1,0 +1,230 @@
+// Data Source: Conexão com o PostgreSQL definido no docker-compose.yml
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Generator: Cria os tipos TypeScript automaticamente (npm install @prisma/client)
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --- Entidades Corporativas (Estrutura Organizacional) ---
+
+model Company {
+  id        String     @id @default(uuid())
+  name      String
+  cnpj      String     @unique
+  employees Employee[]
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  
+  @@map("companies")
+}
+
+model Department {
+  id         String     @id @default(uuid())
+  name       String
+  costCenter String
+  employees  Employee[]
+
+  @@map("departments")
+}
+
+model WorkShift {
+  id          String     @id @default(uuid())
+  name        String
+  description String
+  type        ShiftType  // Enum: FIXO, 12x36, FLEXIVEL
+  employees   Employee[]
+
+  @@map("work_shifts")
+}
+
+// --- Entidade Principal: Colaborador ---
+
+model Employee {
+  id                 String    @id @default(uuid())
+  name               String
+  cpf                String    @unique
+  registration       String    @unique // Matrícula eSocial
+  email              String    @unique
+  phoneNumber        String?
+  role               String
+  cbo                String?   // Classificação Brasileira de Ocupações
+  admissionDate      DateTime
+  status             EmpStatus @default(ATIVO)
+  
+  // Financeiro & Gestão
+  salary             Decimal   @db.Decimal(10, 2)
+  bankHoursBalance   Decimal   @default(0.0) @db.Decimal(10, 2)
+  vacationBalance    Int       @default(0)
+  lastVacationDate   DateTime?
+  onboardingProgress Int       @default(0)
+
+  // Dados flexíveis (Performance/PDI - JSONB do Postgres)
+  performanceData    Json?     // { rating: 4.5, goals: [...] }
+
+  // Relacionamentos
+  companyId    String
+  company      Company    @relation(fields: [companyId], references: [id])
+  
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  
+  shiftId      String
+  shift        WorkShift  @relation(fields: [shiftId], references: [id])
+
+  // Listas
+  punches      Punch[]
+  payslips     Payslip[]
+  assets       Asset[]
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("employees")
+}
+
+// --- Ponto Eletrônico (REP-P - Portaria 671) ---
+
+model Punch {
+  id            String    @id @default(uuid())
+  timestamp     DateTime
+  type          PunchType // ENTRADA, SAIDA, INTERVALO...
+  location      String
+  photo         String?   // Base64 da selfie (armazena string longa)
+  
+  // Compliance & Segurança
+  hash          String    @unique // Hash SHA-256 do registro (Imutabilidade)
+  source        String    // REP-P, AJUSTE_MANUAL
+  synced        Boolean   @default(false)
+  justification String?
+
+  employeeId    String
+  employee      Employee  @relation(fields: [employeeId], references: [id])
+
+  @@index([timestamp]) // Otimizar busca por período
+  @@map("punches")
+}
+
+// --- Folha de Pagamento & Holerites ---
+
+model Payslip {
+  id          String        @id @default(uuid())
+  competencia String        // ex: "05/2024"
+  netValue    Decimal       @db.Decimal(10, 2)
+  status      PayslipStatus @default(DISPONIVEL)
+  
+  // Assinatura Digital
+  signedAt    DateTime?
+  hash        String        // Hash do PDF/A para validação jurídica
+
+  employeeId  String
+  employee    Employee      @relation(fields: [employeeId], references: [id])
+
+  @@map("payslips")
+}
+
+// --- Gestão de Ativos (IT & EPIs) ---
+
+model Asset {
+  id           String    @id @default(uuid())
+  type         AssetType // NOTEBOOK, CELULAR, EPI...
+  name         String
+  serialNumber String
+  deliveryDate DateTime
+  status       String    // EM_USO, DEVOLVIDO
+
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+
+  @@map("assets")
+}
+
+// --- eSocial & Governo ---
+
+model EsocialEvent {
+  id          String   @id @default(uuid())
+  code        String   // S-1200, S-2200
+  description String
+  status      String   // PENDENTE, ENVIADO, ERRO
+  
+  // Payloads JSONB (Poder do Postgres para documentos)
+  payload     Json     // O XML gerado
+  receipt     String?  // Número do recibo do governo
+  response    Json?    // Resposta completa do governo (erros detalhados)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("esocial_events")
+}
+
+// --- Auditoria & Logs (Segurança) ---
+
+model AuditLog {
+  id          String      @id @default(uuid())
+  timestamp   DateTime    @default(now())
+  type        LogType     // FRAUDE, SEGURANCA, SISTEMA
+  severity    LogSeverity // CRITICO, ALTA, MEDIA
+  description String
+  
+  status      String      @default("PENDENTE") // TRATADO, PENDENTE
+  handledAt   DateTime?
+  
+  metadata    Json?       // Dados técnicos (IP, UserAgent, Score Liveness)
+
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+// --- Enums ---
+
+enum ShiftType {
+  FIXO
+  ESCALA_12x36
+  FLEXIVEL
+}
+
+enum EmpStatus {
+  ATIVO
+  FERIAS
+  AFASTADO
+  DESLIGADO
+}
+
+enum PunchType {
+  ENTRADA
+  SAIDA
+  INTERVALO_SAIDA
+  INTERVALO_RETORNO
+}
+
+enum PayslipStatus {
+  DISPONIVEL
+  ASSINADO
+}
+
+enum AssetType {
+  NOTEBOOK
+  CELULAR
+  TOKEN
+  EPI_CALCADO
+  EPI_CAPACETE
+}
+
+enum LogType {
+  FRAUDE
+  SEGURANCA
+  SISTEMA
+  ACESSO
+}
+
+enum LogSeverity {
+  CRITICO
+  ALTA
+  MEDIA
+  BAIXA
+}
