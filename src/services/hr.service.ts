@@ -1,4 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
+import { GoogleGenAI, Type } from "@google/genai";
 
 export interface Punch {
   id: string;
@@ -99,6 +100,13 @@ export interface Employee {
   bankHoursBalance: number; // Saldo individual
   vacationBalance: number; // Dias de férias acumulados
   lastVacationDate?: string; // Fim das últimas férias
+}
+
+export interface AiBenchmarkResult {
+  toolName: string;
+  globalFeature: string;
+  brazilAdaptation: string;
+  complianceNote: string;
 }
 
 @Injectable({
@@ -300,19 +308,34 @@ export class HrService {
     this.employees.update(list => [...list, newEmp]);
     this.logSystemAction('CADASTRO_FUNC', `Funcionário ${newEmp.name} cadastrado. Matrícula: ${newEmp.registration}`);
   }
+  
+  // Method to assign asset to an employee
+  assignAsset(employeeId: string, asset: Asset) {
+    this.employees.update(list => list.map(emp => {
+      if (emp.id === employeeId) {
+        return {
+          ...emp,
+          assets: [...emp.assets, asset]
+        };
+      }
+      return emp;
+    }));
+    this.logSystemAction('ATIVOS', `Ativo ${asset.name} (${asset.type}) atribuído ao funcionário ID ${employeeId}.`);
+  }
 
   // LOGGING & SECURITY
-  triggerSecurityLockout() {
+  triggerSecurityLockout(customReason?: string) {
     if (this.isLockedOut()) return;
     
     const durationMinutes = 5;
     const endTime = new Date(new Date().getTime() + durationMinutes * 60000);
+    const description = customReason || `BLOQUEIO DE SEGURANÇA: Funcionalidade de ponto suspensa por ${durationMinutes} min devido a múltiplas falhas de biometria.`;
     
     this.isLockedOut.set(true);
     this.lockoutEndTime.set(endTime);
     
     this.logFraudAttempt(
-      `BLOQUEIO DE SEGURANÇA: Funcionalidade de ponto suspensa por ${durationMinutes} min devido a múltiplas falhas de biometria.`,
+      description,
       { blockedUntil: endTime }
     );
 
@@ -395,18 +418,66 @@ export class HrService {
     ));
   }
 
+  // --- AI Market Benchmark Integration ---
+  async getMarketBenchmarks(): Promise<{ items: AiBenchmarkResult[], sources: any[] }> {
+    try {
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+        throw new Error('API Key não configurada');
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+      
+      const response = await ai.models.generateContent({
+         model: "gemini-2.5-flash",
+         contents: "Pesquise pelas ferramentas de RH líderes globais como 'Rippling', 'Deel' e 'BambooHR'. Identifique 3 ferramentas principais. Para cada uma, descreva sua funcionalidade 'Global' de destaque e explique tecnicamente como ela deve ser adaptada para atender a legislação brasileira (CLT, eSocial S-1.2, Portaria 671 e LGPD). Retorne APENAS um JSON seguindo este schema para os itens: [{toolName, globalFeature, brazilAdaptation, complianceNote}].",
+         config: {
+           tools: [{googleSearch: {}}],
+           responseMimeType: "application/json",
+           responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  toolName: { type: Type.STRING },
+                  globalFeature: { type: Type.STRING },
+                  brazilAdaptation: { type: Type.STRING },
+                  complianceNote: { type: Type.STRING }
+                },
+                required: ["toolName", "globalFeature", "brazilAdaptation", "complianceNote"]
+              }
+            }
+         },
+      });
+
+      const json = JSON.parse(response.text.trim());
+      const grounding = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+
+      return {
+        items: json,
+        sources: grounding
+      };
+
+    } catch (error) {
+      console.error('Erro ao buscar benchmarks:', error);
+      return { items: [], sources: [] };
+    }
+  }
+
   // Sync Logic
   private processPunchSync(punch: Punch): Promise<void> {
     // Returns a promise to allow sequential processing
     return new Promise((resolve) => {
-      // Simulate API network delay (faster than before for batch effect)
+      // Simulate variable network delay (300ms to 800ms) for realistic "popcorn" effect on progress bar
+      const delay = Math.floor(Math.random() * 500) + 300;
+      
       setTimeout(() => {
         this.punches.update(list => list.map(p => 
           p.id === punch.id 
             ? { 
                 ...p, 
                 synced: true, 
-                // If it was offline, we pretend server resolved location or accepted the offline coordinates
+                // Update location if it was offline
                 location: p.location.includes('Offline') || p.location.includes('Pendente') 
                   ? 'Sincronizado (Localização Estimada)' 
                   : p.location 
@@ -415,7 +486,7 @@ export class HrService {
         ));
         this.saveToStorage();
         resolve();
-      }, 800);
+      }, delay);
     });
   }
 
@@ -428,27 +499,31 @@ export class HrService {
     if (pending.length === 0) return;
 
     // 2. Initialize Sync State
-    console.log(`[Sync] Iniciando sincronização de ${pending.length} registros...`);
+    console.log(`[Sync] Otimizado: Iniciando sincronização paralela de ${pending.length} registros...`);
     this.syncState.set({
       isSyncing: true,
       total: pending.length,
       current: 0
     });
 
-    // 3. Process Sequentially
-    for (const punch of pending) {
-      await this.processPunchSync(punch);
-      this.syncState.update(state => ({
-        ...state,
-        current: state.current + 1
-      }));
-    }
+    // 3. Process in Parallel (Optimized) with Progress Tracking
+    // We map each punch to a promise that updates the counter when it resolves
+    const syncPromises = pending.map(punch => 
+      this.processPunchSync(punch).then(() => {
+        this.syncState.update(state => ({
+          ...state,
+          current: state.current + 1
+        }));
+      })
+    );
+
+    await Promise.all(syncPromises);
 
     // 4. Cleanup State
     setTimeout(() => {
       this.syncState.set({ isSyncing: false, total: 0, current: 0 });
       console.log('[Sync] Sincronização concluída.');
-    }, 1500); // Give user time to see "100%"
+    }, 1000); 
   }
 
   // Persistence

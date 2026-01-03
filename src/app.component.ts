@@ -8,6 +8,7 @@ import { PayslipsComponent } from './components/payslips.component';
 import { BankOfHoursComponent } from './components/bank-of-hours.component';
 import { EsocialStatusComponent } from './components/esocial-status.component';
 import { AdminPanelComponent } from './components/admin-panel.component';
+import { LogoComponent } from './components/logo.component';
 
 @Component({
   selector: 'app-root',
@@ -21,7 +22,8 @@ import { AdminPanelComponent } from './components/admin-panel.component';
     PayslipsComponent,
     BankOfHoursComponent,
     EsocialStatusComponent,
-    AdminPanelComponent
+    AdminPanelComponent,
+    LogoComponent
   ],
   templateUrl: './app.component.html',
 })

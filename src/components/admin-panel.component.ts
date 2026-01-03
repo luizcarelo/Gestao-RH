@@ -2,7 +2,9 @@ import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 import { HrService, Employee } from '../services/hr.service';
-import { ComplianceDashboardComponent } from './compliance-dashboard.component'; // Import new component
+import { ComplianceDashboardComponent } from './compliance-dashboard.component';
+import { AssetsManagementComponent } from './assets-management.component';
+import { HrToolsBenchmarkComponent } from './hr-tools-benchmark.component'; // Import new component
 // Importando biblioteca externa definida no importmap
 import { cpf } from 'cpf-cnpj-validator';
 
@@ -22,7 +24,7 @@ export function cpfLibValidator(): ValidatorFn {
 
 @Component({
   selector: 'app-admin-panel',
-  imports: [CommonModule, DatePipe, ReactiveFormsModule, ComplianceDashboardComponent], // Add to imports
+  imports: [CommonModule, DatePipe, ReactiveFormsModule, ComplianceDashboardComponent, AssetsManagementComponent, HrToolsBenchmarkComponent], // Add to imports
   template: `
     <div class="space-y-6">
       <!-- Top Navigation Tabs -->
@@ -54,9 +56,18 @@ export function cpfLibValidator(): ValidatorFn {
           [class.text-slate-500]="activeTab() !== 'assets'">
           💻 Ativos & IT (Rippling)
         </button>
+        <button 
+          (click)="activeTab.set('benchmark')"
+          class="px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap flex items-center gap-1"
+          [class.bg-white]="activeTab() === 'benchmark'"
+          [class.text-indigo-600]="activeTab() === 'benchmark'"
+          [class.shadow-sm]="activeTab() === 'benchmark'"
+          [class.text-slate-500]="activeTab() !== 'benchmark'">
+          <span class="text-xs">✨</span> Benchmark IA
+        </button>
       </div>
 
-      <!-- TAB: COMPLIANCE (Updated with New Dashboard) -->
+      <!-- TAB: COMPLIANCE -->
       @if (activeTab() === 'compliance') {
         <div class="space-y-8 animate-fade-in">
           <!-- Header -->
@@ -72,7 +83,7 @@ export function cpfLibValidator(): ValidatorFn {
             </div>
           </div>
 
-          <!-- NEW: Visual Dashboard Component -->
+          <!-- Visual Dashboard Component -->
           <app-compliance-dashboard />
 
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -161,7 +172,7 @@ export function cpfLibValidator(): ValidatorFn {
         </div>
       }
 
-      <!-- TAB: EMPLOYEES (Enhanced with Onboarding/BambooHR) -->
+      <!-- TAB: EMPLOYEES -->
       @if (activeTab() === 'employees') {
         <div class="space-y-6 animate-fade-in">
           <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -281,68 +292,14 @@ export function cpfLibValidator(): ValidatorFn {
         </div>
       }
 
-      <!-- TAB: ASSETS (Rippling Style) -->
+      <!-- TAB: ASSETS (Dedicated Component) -->
       @if (activeTab() === 'assets') {
-        <div class="space-y-6 animate-fade-in">
-           <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h2 class="text-2xl font-bold text-slate-800">Gestão de Ativos & IT</h2>
-              <p class="text-slate-500 text-sm">Inventário de Notebooks, Celulares e EPIs (NR-6) entregues.</p>
-            </div>
-            <div class="flex gap-2">
-              <button class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900 transition flex items-center gap-2">
-                <span>📦</span> Atribuir Equipamento
-              </button>
-            </div>
-          </div>
+        <app-assets-management />
+      }
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            @for (emp of hrService.employees(); track emp.id) {
-               <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                  <div class="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100">
-                    <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600">
-                      {{ emp.name.charAt(0) }}
-                    </div>
-                    <div>
-                      <div class="font-bold text-slate-800">{{ emp.name }}</div>
-                      <div class="text-xs text-slate-500">{{ emp.role }}</div>
-                    </div>
-                  </div>
-
-                  <div class="space-y-3">
-                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Ativos em Posse</div>
-                    @if (emp.assets.length === 0) {
-                      <div class="text-sm text-slate-400 italic bg-slate-50 p-2 rounded text-center">Nenhum equipamento vinculado</div>
-                    } @else {
-                      <ul class="space-y-2">
-                        @for (asset of emp.assets; track asset.id) {
-                          <li class="flex items-center justify-between text-sm bg-slate-50 p-2 rounded border border-slate-100">
-                             <div class="flex items-center gap-2">
-                               @switch (asset.type) {
-                                 @case ('NOTEBOOK') { <span>💻</span> }
-                                 @case ('CELULAR') { <span>📱</span> }
-                                 @case ('TOKEN') { <span>🔑</span> }
-                                 @default { <span>🛡️</span> }
-                               }
-                               <span class="font-medium text-slate-700">{{ asset.name }}</span>
-                             </div>
-                             <span class="text-[10px] bg-green-100 text-green-700 px-1.5 rounded font-medium">Em Uso</span>
-                          </li>
-                        }
-                      </ul>
-                    }
-                    
-                    <!-- Termo de responsabilidade alert -->
-                    @if (emp.assets.length > 0) {
-                       <div class="mt-4 flex items-center gap-2 text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-100 cursor-pointer hover:bg-blue-100 transition">
-                         <span>📝</span> Ver Termo de Responsabilidade
-                       </div>
-                    }
-                  </div>
-               </div>
-            }
-          </div>
-        </div>
+      <!-- TAB: BENCHMARK IA (New) -->
+      @if (activeTab() === 'benchmark') {
+        <app-hr-tools-benchmark />
       }
     </div>
 
@@ -519,7 +476,7 @@ export class AdminPanelComponent {
   hrService = inject(HrService);
   fb: FormBuilder = inject(FormBuilder);
   
-  activeTab = signal<'compliance' | 'employees' | 'assets'>('compliance');
+  activeTab = signal<'compliance' | 'employees' | 'assets' | 'benchmark'>('compliance');
   isModalOpen = signal(false);
   
   // Computed para contar logs pendentes

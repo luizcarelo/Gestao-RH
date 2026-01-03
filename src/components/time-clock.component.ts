@@ -634,29 +634,29 @@ export class TimeClockComponent implements OnDestroy {
     this.attempts.set(currentAttempts);
     this.livenessStep.set('ERROR');
 
-    // Audit Log Trigger
-    if (currentAttempts >= 3) {
+    // Audit Log Trigger (for failed attempt)
+    if (currentAttempts < 3) {
       this.hrService.logFraudAttempt(
-        `Falha repetida de liveness (Score: ${score.toFixed(2)}).`,
+        `Falha de liveness detectada (Score: ${score.toFixed(2)}). Tentativa ${currentAttempts}/3.`,
         { attempts: currentAttempts, device: navigator.userAgent }
       );
     }
 
-    // Lockout Logic Check
-    if (currentAttempts > 3) {
+    // Lockout Logic Check - Trigger IMMEDIATELY on 3rd failure
+    if (currentAttempts >= 3) {
+      this.hrService.triggerSecurityLockout(
+        `BLOQUEIO CRÍTICO: Limite de 3 tentativas falhas de biometria atingido (Score final: ${score.toFixed(2)}).`
+      );
       this.closeCamera();
-      this.hrService.triggerSecurityLockout();
-      return;
+      return; // Stop execution, do not retry
     }
 
-    // Retry Logic
-    if (currentAttempts <= 3) {
-       setTimeout(() => {
-         if (this.isCameraOpen()) {
-           this.startLivenessCheck();
-         }
-       }, 2000); // Give user 2 seconds to see error before retrying
-    }
+    // Retry Logic (only if < 3)
+    setTimeout(() => {
+      if (this.isCameraOpen()) {
+        this.startLivenessCheck();
+      }
+    }, 2000); // Give user 2 seconds to see error before retrying
   }
 
   closeCamera() {
